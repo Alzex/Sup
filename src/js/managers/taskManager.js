@@ -8,7 +8,8 @@ const taskManager = {
     return db.query('SELECT * FROM task WHERE id = ?', [id]);
   },
   create(task) {
-    return db.query('INSERT INTO task SET name = ?, description = ?', [task.name, task.description]);
+    return db.query('INSERT INTO task SET name = ?, description = ?', [task.name, task.description])
+      .then(() => db.query('SELECT * FROM task WHERE id = LAST_INSERT_ID()'));
   },
   update(id, task) {
     return db.query(
@@ -18,7 +19,7 @@ const taskManager = {
         task.description,
         task.artifactId,
         task.id
-      ]);
+      ]).then(() => this.getOne(id));
   },
   delete(id) {
     return db.query('DELETE FROM task WHERE id = ?', [id]);
