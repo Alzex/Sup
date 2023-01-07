@@ -13,7 +13,7 @@ router
   .get('/tasks', taskController.getTasks)
   .get('/tasks/:id', taskController.getTask)
   .post('/tasks', taskController.createTask)
-  .put('/tasks', taskController.updateTask)
+  .put('/tasks/:id', taskController.updateTask)
   .delete('/tasks/:id', taskController.deleteTask);
 
 module.exports = router;
