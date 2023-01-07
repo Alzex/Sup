@@ -29,7 +29,7 @@ module.exports = {
 
     const taskRows = await taskManager.createTask(description, deadline, artifactId);
 
-    ctx.body = taskRows[0];
+    ctx.body = taskRows[0][0];
     ctx.status = 201;
     await next();
   },
@@ -42,26 +42,26 @@ module.exports = {
     }
 
     const taskRows = await taskManager.getTask(id);
-    if (!taskRows.length) {
+    if (!taskRows[0].length) {
       return ctx.throw(404, `Task with id ${id} not found`);
     }
 
     const updatedTaskRows = await taskManager.updateTask(id, description, deadline, artifactId);
 
-    ctx.body = updatedTaskRows[0];
+    ctx.body = updatedTaskRows[0][0];
     ctx.status = 200;
     await next();
   },
   async deleteTask(ctx, next) {
     const { id } = ctx.params;
     const taskRows = await taskManager.getTask(id);
-    if (!taskRows.length) {
+    if (!taskRows[0].length) {
       return ctx.throw(404, `Task with id ${id} not found`);
     }
 
     await taskManager.deleteTask(id);
 
-    ctx.body = taskRows[0];
+    ctx.body = taskRows[0][0];
     ctx.status = 200;
     await next();
   },
