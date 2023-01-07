@@ -1,16 +1,16 @@
-const express = require('express');
-const config = require('./configuration/config');
-const routes = require('./routes');
+const Koa = require('koa');
+const http = require('http');
+const { port } = require('./config');
+const router = require('./routes');
 
-const app = express();
+const app = new Koa();
 
-const { port } = config();
+app
+  .use(router.routes())
+  .use(router.allowedMethods());
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const server = http.createServer(app.callback());
 
-app.use('/api/v1', routes);
-
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+server.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });

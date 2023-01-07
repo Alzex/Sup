@@ -1,80 +1,53 @@
 const taskManager = require('../managers/taskManager');
+const {db} = require("../config");
 
-const taskController = {
-  async getAll(req, res) {
-    const tasks = await taskManager.getAll();
-    res.json(tasks);
+module.exports = {
+  async getTasks(ctx, next) {
+    ctx.body = await taskManager.getTasks();
+    ctx.status = 200;
+    await next();
   },
+  async getTask(ctx, next) {
+    const { id } = ctx.params;
+    const taskRows = await taskManager.getTask(id);
 
-  async getOne(req, res) {
-    const { id } = req.params;
-
-    const task = await taskManager.getOne(id);
-
-    if (task.length === 0) {
-      return res.status(404).json({
-        message: `Task with id ${id} not found`,
-      });
+    if (!taskRows.length) {
+      return ctx.throw(404, `Task with id ${id} not found`);
     }
 
-    res.json(task[0]);
+    ctx.body = taskRows[0];
+    ctx.status = 200;
+    await next();
   },
-
-  async create(req, res) {
-    const { name, description } = req.body;
-
-    if (!name || !description) {
-      return res.status(400).json({
-        message: 'Name and description are required',
-      });
+  async createTask(ctx, next) {
+    const { description, deadline, artifactId } = ctx.request.body;
+    if (!description) {
+      return ctx.throw(400, 'Description is required');
     }
 
-    try {
-      const task = await taskManager.create({ name, description });
-      res.status(201).json(task);
-    } catch (error) {
-      res.status(500).json({
-        message: 'Internal server error',
-      });
-    }
+    const taskRows = await taskManager.createTask(description, deadline, artifactId);
+
+    ctx.body = taskRows[0];
+    ctx.status = 201;
+    await next();
   },
-  async update(req, res) {
-    const { id } = req.params;
-    const { name, description, artifactId } = req.body;
+  async updateTask(ctx, next) {
+    const { id } = ctx.params;
+    const { description, deadline, artifactId } = ctx.request.body;
 
-    const taskToUpdate = await taskManager.getOne(id);
-
-    if (taskToUpdate.length === 0) {
-      return res.status(404).json({
-        message: `Task with id ${id} not found`,
-      });
-    }
-
-    if (!name || !description) {
-      return res.status(400).json({
-        message: 'Name and description are required',
-      });
-    }
-
-    const task = await taskManager.update(id, { name, description, artifactId });
-
-    res.json(task);
 
   },
-  async delete(req, res) {
-    const { id } = req.params;
-    const task = await taskManager.getOne(id);
-
-    if (task.length === 0) {
-      return res.status(404).json({
-        message: `Task with id ${id} not found`,
-      });
+  async deleteTask(ctx, next) {
+    const { id } = ctx.params;
+    const taskRows = await taskManager.getTask(id);
+    if (!taskRows.length) {
+      return ctx.throw(404, `Task with id ${id} not found`);
     }
 
-    await taskManager.delete(id);
+    await taskManager.deleteTask(id);
 
-    res.json(task[0]);
+    ctx.body = taskRows[0];
+    ctx.status = 200;
+    await next();
   },
 }
-
-module.exports = taskController;

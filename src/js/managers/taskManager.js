@@ -1,29 +1,30 @@
 const db = require('../modules/db');
 
-const taskManager = {
-  getAll() {
+module.exports = {
+  getTasks() {
     return db.query('SELECT * FROM task');
   },
-  getOne(id) {
+  getTask(id) {
     return db.query('SELECT * FROM task WHERE id = ?', [id]);
   },
-  create(task) {
-    return db.query('INSERT INTO task SET name = ?, description = ?', [task.name, task.description])
-      .then(() => db.query('SELECT * FROM task WHERE id = LAST_INSERT_ID()'));
-  },
-  update(id, task) {
-    return db.query(
-      'UPDATE task SET name = ?, description = ?, artifact_id = ? WHERE id = ?',
+  createTask(description, deadline, artifactId) {
+    return db.query('INSERT INTO task (description, deadline, artifact_id) VALUES (?, ?, ?)',
       [
-        task.name,
-        task.description,
-        task.artifactId,
-        task.id
-      ]).then(() => this.getOne(id));
+        description,
+        deadline || null,
+        artifactId || null,
+      ],
+    ).then(() => {
+      return db.query('SELECT * FROM task WHERE id = LAST_INSERT_ID()');
+    });
   },
-  delete(id) {
-    return db.query('DELETE FROM task WHERE id = ?', [id]);
-  },
-}
+  updateTask(id, parameters, values) {
+    return db.query(`UPDATE task SET (${parameters.join(',')}) WHERE id = ?`, values)
+      .then(() => this.getTask(id));
+  }
 
-module.exports = taskManager;
+  },
+  deleteTask(id) {
+    return db.query('DELETE FROM task WHERE id = ?', [id]);
+  }
+}
