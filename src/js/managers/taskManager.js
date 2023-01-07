@@ -18,13 +18,18 @@ module.exports = {
       return db.query('SELECT * FROM task WHERE id = LAST_INSERT_ID()');
     });
   },
-  updateTask(id, parameters, values) {
-    return db.query(`UPDATE task SET (${parameters.join(',')}) WHERE id = ?`, values)
-      .then(() => this.getTask(id));
-  }
-
+  updateTask(id, description, deadline, artifactId) {
+    return db.query(`UPDATE task SET description = ?, deadline = ?, artifact_id = ? WHERE id = ?`,
+      [
+        description,
+        deadline || null,
+        artifactId || null,
+        id
+      ]
+    ).then(() => this.getTask(id));
   },
+
   deleteTask(id) {
     return db.query('DELETE FROM task WHERE id = ?', [id]);
-  }
+  },
 }

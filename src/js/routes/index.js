@@ -1,6 +1,7 @@
 const Router = require('koa-router');
-const koaBody = require('koa-body');
+const { koaBody } = require('koa-body');
 const taskController = require('../controllers/taskController');
+const errorHandler = require('../middlewares/errorHandler');
 
 const router = new Router({
   prefix: '/api',
@@ -8,6 +9,7 @@ const router = new Router({
 
 router
   .use(koaBody())
+  .use(errorHandler)
   .get('/tasks', taskController.getTasks)
   .get('/tasks/:id', taskController.getTask)
   .post('/tasks', taskController.createTask)

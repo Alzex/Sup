@@ -1,9 +1,11 @@
 const taskManager = require('../managers/taskManager');
-const {db} = require("../config");
+const { db } = require('../config');
 
 module.exports = {
   async getTasks(ctx, next) {
-    ctx.body = await taskManager.getTasks();
+    const tasks = await taskManager.getTasks();
+
+    ctx.body = tasks[0];
     ctx.status = 200;
     await next();
   },
@@ -11,11 +13,11 @@ module.exports = {
     const { id } = ctx.params;
     const taskRows = await taskManager.getTask(id);
 
-    if (!taskRows.length) {
-      return ctx.throw(404, `Task with id ${id} not found`);
+    if (!taskRows[0].length) {
+      return ctx.throw(404, {message: `Task with id ${id} not found`});
     }
 
-    ctx.body = taskRows[0];
+    ctx.body = taskRows[0][0];
     ctx.status = 200;
     await next();
   },
@@ -35,7 +37,20 @@ module.exports = {
     const { id } = ctx.params;
     const { description, deadline, artifactId } = ctx.request.body;
 
+    if (!description) {
+      return ctx.throw(400, 'Description is required');
+    }
 
+    const taskRows = await taskManager.getTask(id);
+    if (!taskRows.length) {
+      return ctx.throw(404, `Task with id ${id} not found`);
+    }
+
+    const updatedTaskRows = await taskManager.updateTask(id, description, deadline, artifactId);
+
+    ctx.body = updatedTaskRows[0];
+    ctx.status = 200;
+    await next();
   },
   async deleteTask(ctx, next) {
     const { id } = ctx.params;
