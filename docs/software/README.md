@@ -176,3 +176,259 @@ SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
 
 ## RESTfull сервіс для управління даними
 
+Для реалізації RESTfull сервісу використовується бібліотека `Koa.js`.  
+Для роботи з базою даних використовується бібліотека `mysql2`.
+
+### Структура проекту
+
+  * `app.js` - головний файл проекту, в якому виконується ініціалізація сервера та роутів
+---
+  * `config` - папка з конфігураційними файлами
+  * `config/index.js` - файл з конфігурацією сервера та бази даних
+---
+  * `routes` - папка з файлами роутів
+  * `routes/index.js` - файл з роутами для роботи
+---
+  * `managers` - папка з файлами менеджерів (виконують роботу з базою даних)
+  * `managers/taskManager.js` - файл з менеджером для роботи з таблицею `task` 
+---
+  * `controllers` - папка з файлами контролерів (містять логіку роботи з роутами)
+  * `controllers/taskController.js` - файл з контролером для роботи з таблицею `task`
+---
+  * `middlewares` - папка з файлами middleware (виконують обробку/перевірку даних перед виконанням роута)'
+  * `middlewares/errorHandler.js` - файл з middleware для обробки помилок
+---
+  * `modules` - папка з модулями
+  * `modules/db.js` - модуль для роботи з базою даних
+---
+  * `package.json` - файл з описом проекту та залежностями
+  * `package-lock.json` - файл з залежностями проекту
+
+### Конфігурація сервера та бази даних
+
+Конфігурація сервера та бази даних знаходиться в файлі `config/index.js`
+
+```javascript
+require('dotenv').config();
+
+module.exports = {
+  port: process.env.PORT || 3000,
+  db: {
+    database: process.env.DB_NAME || 'SUP',
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+  },
+};
+```
+Для коректної роботи необхідно створити файл `.env` в корені проекту та вказати в ньому налаштування для бази даних та сервера.
+
+Приклад файлу `.env`:
+```
+#Порт сервера
+PORT=3000
+
+#Налаштування бази даних
+DB_NAME=SUP
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=abc123
+DB_PORT=3306
+```
+
+### Головний файл
+
+Головний файл `app.js`.
+
+```javascript
+const Koa = require('koa');
+const http = require('http');
+const { port } = require('./config');
+const router = require('./routes');
+
+const app = new Koa();
+
+app
+  .use(router.routes())
+  .use(router.allowedMethods());
+
+const server = http.createServer(app.callback());
+
+server.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
+```
+
+### Маршрутизація
+
+Маршрутизація знаходиться в файлі `routes/index.js`.
+
+```javascript
+const Router = require('koa-router');
+const { koaBody } = require('koa-body');
+const taskController = require('../controllers/taskController');
+const errorHandler = require('../middlewares/errorHandler');
+
+const router = new Router({
+  prefix: '/api',
+});
+
+router
+  .use(koaBody())
+  .use(errorHandler)
+  .get('/tasks', taskController.getTasks)
+  .get('/tasks/:id', taskController.getTask)
+  .post('/tasks', taskController.createTask)
+  .put('/tasks/:id', taskController.updateTask)
+  .delete('/tasks/:id', taskController.deleteTask);
+
+module.exports = router;
+```
+
+### Модуль для роботи з базою даних
+
+Модуль для роботи з базою даних знаходиться в файлі `modules/db.js`.
+
+```javascript
+const mysql = require('mysql2/promise');
+const { db } = require('../config');
+
+const pool = mysql.createPool({ ...db });
+
+module.exports = pool;
+```
+
+### Менеджер для роботи з таблицею `task`
+
+Менеджер для роботи з таблицею `task` знаходиться в файлі `managers/taskManager.js`.
+
+```javascript
+const db = require('../modules/db');
+
+module.exports = {
+  getTasks() {
+    return db.query('SELECT * FROM task');
+  },
+  getTask(id) {
+    return db.query('SELECT * FROM task WHERE id = ?', [id]);
+  },
+  createTask(description, deadline, artifactId) {
+    return db.query('INSERT INTO task (description, deadline, artifact_id) VALUES (?, ?, ?)',
+      [
+        description,
+        deadline || null,
+        artifactId || null,
+      ],
+    ).then(() => {
+      return db.query('SELECT * FROM task WHERE id = LAST_INSERT_ID()');
+    });
+  },
+  updateTask(id, description, deadline, artifactId) {
+    return db.query(`UPDATE task SET description = ?, deadline = ?, artifact_id = ? WHERE id = ?`,
+      [
+        description,
+        deadline || null,
+        artifactId || null,
+        id
+      ]
+    ).then(() => this.getTask(id));
+  },
+
+  deleteTask(id) {
+    return db.query('DELETE FROM task WHERE id = ?', [id]);
+  },
+}
+```
+
+### Контролер для роботи з таблицею `task`
+
+Контролер для роботи з таблицею `task` знаходиться в файлі `controllers/taskController.js`.
+
+```javascript
+const taskManager = require('../managers/taskManager');
+const { db } = require('../config');
+
+module.exports = {
+  async getTasks(ctx, next) {
+    const tasks = await taskManager.getTasks();
+
+    ctx.body = tasks[0];
+    ctx.status = 200;
+    await next();
+  },
+  async getTask(ctx, next) {
+    const { id } = ctx.params;
+    const taskRows = await taskManager.getTask(id);
+
+    if (!taskRows[0].length) {
+      return ctx.throw(404, {message: `Task with id ${id} not found`});
+    }
+
+    ctx.body = taskRows[0][0];
+    ctx.status = 200;
+    await next();
+  },
+  async createTask(ctx, next) {
+    const { description, deadline, artifactId } = ctx.request.body;
+    if (!description) {
+      return ctx.throw(400, 'Description is required');
+    }
+
+    const taskRows = await taskManager.createTask(description, deadline, artifactId);
+
+    ctx.body = taskRows[0][0];
+    ctx.status = 201;
+    await next();
+  },
+  async updateTask(ctx, next) {
+    const { id } = ctx.params;
+    const { description, deadline, artifactId } = ctx.request.body;
+
+    if (!description) {
+      return ctx.throw(400, 'Description is required');
+    }
+
+    const taskRows = await taskManager.getTask(id);
+    if (!taskRows[0].length) {
+      return ctx.throw(404, `Task with id ${id} not found`);
+    }
+
+    const updatedTaskRows = await taskManager.updateTask(id, description, deadline, artifactId);
+
+    ctx.body = updatedTaskRows[0][0];
+    ctx.status = 200;
+    await next();
+  },
+  async deleteTask(ctx, next) {
+    const { id } = ctx.params;
+    const taskRows = await taskManager.getTask(id);
+    if (!taskRows[0].length) {
+      return ctx.throw(404, `Task with id ${id} not found`);
+    }
+
+    await taskManager.deleteTask(id);
+
+    ctx.body = taskRows[0][0];
+    ctx.status = 200;
+    await next();
+  },
+}
+```
+
+### Мідлвар для обробки помилок
+
+Мідлвар для обробки помилок знаходиться в файлі `middlewares/errorHandler.js`.  
+Мідлвар обгортає помилки які виникають в контролерах у формат JSON.
+
+```javascript
+module.exports = async (ctx, next) => {
+  try {
+    await next();
+  } catch (err) {
+    const { status = 500, message } = err;
+    ctx.status = status;
+    ctx.body = { status, message };
+  }
+}
+```
